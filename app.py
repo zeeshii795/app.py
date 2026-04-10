@@ -1,46 +1,116 @@
 import streamlit as st
 import google.generativeai as genai
 
-# 1. Setup Gemini API
-# Yahan apni API Key dalein ya Streamlit secrets use karein
-API_KEY = "AIzaSyDiIKEpN6uMB41BqdfK7RIzkX-YpbbbEFE" 
-genai.configure(api_key=API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+# --- VIP UI Configuration ---
+st.set_page_config(
+    page_title="FirstResponse.Ai | Emergency Agent",
+    page_icon="🚑",
+    layout="wide"
+)
 
-# 2. UI Configuration
-st.set_page_config(page_title="FirstResponse.Ai", page_icon="🚑")
+# --- Theme & CSS Styling ---
+st.markdown("""
+    <style>
+    .main {
+        background-color: #f8f9fa;
+    }
+    .stButton>button {
+        width: 100%;
+        border-radius: 12px;
+        height: 3.5em;
+        background-color: #D32F2F;
+        color: white;
+        font-weight: bold;
+        border: none;
+        transition: 0.3s;
+    }
+    .stButton>button:hover {
+        background-color: #B71C1C;
+        color: white;
+        transform: scale(1.02);
+    }
+    .emergency-card {
+        padding: 25px;
+        border-radius: 15px;
+        background-color: #ffffff;
+        border-left: 8px solid #D32F2F;
+        box-shadow: 0px 4px 20px rgba(0,0,0,0.1);
+        color: #212121;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-st.markdown("# 🚑 FirstResponse.Ai")
-st.info("Emergency First-Aid Assistant: Doctor ke anay tak kya karna hai?")
+# --- Gemini API Setup ---
+# Ensure "GEMINI_API_KEY" is set in your Streamlit Cloud Secrets
+try:
+    API_KEY = st.secrets["GEMINI_API_KEY"]
+    genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel('gemini-1.5-flash')
+except Exception as e:
+    st.error("API Key not found. Please configure Secrets in Streamlit Cloud.")
 
-# 3. System Prompt (The Rules)
-SYSTEM_PROMPT = """
-You are an expert Emergency Medical Responder. Your goal is to provide life-saving first-aid 
-instructions to someone in a crisis. 
-Rules:
-1. ALWAYS start by telling the user to call 1122, 911, or local emergency services.
-2. Give short, bulleted, step-by-step instructions.
-3. Be calm, clear, and direct.
-4. If it's a life-threatening situation (like no breathing), prioritize CPR or bleeding control.
-5. Use simple English or Urdu if requested.
-"""
+# --- Header Section ---
+col1, col2 = st.columns([1, 5])
+with col1:
+    # Medical Icon
+    st.image("https://cdn-icons-png.flaticon.com/512/883/883407.png", width=100)
+with col2:
+    st.markdown("# **FirstResponse.Ai**")
+    st.markdown("### *Your Intelligent First-Aid Companion*")
 
-# 4. User Interaction
-user_query = st.text_input("Kya emergency pesh ayi hai? (Maslan: Choking, Heart Attack, Deep Cut)")
+st.divider()
 
-if user_query:
-    with st.spinner('Generating life-saving instructions...'):
+# --- VIP Options (Quick Response Buttons) ---
+st.subheader("🚨 Quick Selection: Choose an Emergency")
+st.write("Click a button for instant instructions or describe the situation below:")
+
+c1, c2, c3, c4 = st.columns(4)
+quick_query = ""
+
+if c1.button("🩸 Severe Bleeding"):
+    quick_query = "Heavy bleeding from a deep wound"
+if c2.button("🫁 Choking / Difficulty Breathing"):
+    quick_query = "Person is choking and cannot breathe"
+if c3.button("⚡ Cardiac Arrest / Unconscious"):
+    quick_query = "Person is unconscious and not breathing"
+if c4.button("🔥 Severe Burns"):
+    quick_query = "Serious burn injury from fire or chemicals"
+
+# --- Search Bar ---
+st.markdown("---")
+user_input = st.text_input("💬 Describe the emergency in detail:", value=quick_query, placeholder="e.g., Someone fell from stairs and hit their head...")
+
+# --- Logic & AI Response ---
+if user_input:
+    with st.spinner('Fetching life-saving protocols...'):
+        system_prompt = """
+        You are a Professional Emergency Medical Responder.
+        Structure your response as follows:
+        1. MANDATORY: Start with a Bold Red Header: 'STEP 0: CALL EMERGENCY SERVICES IMMEDIATELY!'
+        2. 'Immediate Actions': Provide 4-5 high-priority, bulleted, numbered steps. Use bold text for key movements.
+        3. 'What NOT to do': List 2-3 critical mistakes to avoid.
+        4. 'Observation': What to monitor while waiting for the ambulance.
+        Keep it extremely concise and easy to read under pressure.
+        """
         try:
-            full_prompt = f"{SYSTEM_PROMPT}\n\nUser Emergency: {user_query}"
-            response = model.generate_content(full_prompt)
+            response = model.generate_content(f"{system_prompt}\n\nSituation: {user_input}")
             
-            st.markdown("### 📝 Fori Iqdaamat (Immediate Steps):")
-            st.write(response.text)
+            # Displaying in a VIP card
+            st.markdown(f"""
+                <div class="emergency-card">
+                    <h2 style="color: #D32F2F; margin-top:0;">📝 Critical Response Plan</h2>
+                    <hr>
+                    {response.text}
+                </div>
+            """, unsafe_allow_html=True)
             
-            st.warning("Disclaimer: Yeh AI mashwara hai. Asal doctor ki jagah nahi le sakta.")
         except Exception as e:
-            st.error(f"Error: {e}")
+            st.error("System timeout. Please try again or check your internet connection.")
 
-# 5. Sidebar info
-st.sidebar.title("About")
-st.sidebar.write("FirstResponse.Ai helps bridge the gap during the 'Golden Hour' of medical emergencies.")
+# --- Bottom Sidebar ---
+st.sidebar.title("🚑 About FirstResponse")
+st.sidebar.info("This AI agent provides immediate first-aid guidance during the 'Golden Hour'—the critical period before professional medical help arrives.")
+st.sidebar.warning("**Disclaimer:** This is an AI-generated guide for educational/emergency support. Always prioritize professional medical services.")
+
+if st.sidebar.button("🔄 Reset App"):
+    st.rerun()
